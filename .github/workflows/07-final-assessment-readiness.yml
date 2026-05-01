@@ -1,79 +1,83 @@
-# This workflow checks whether the final assessment setup is ready.
-# It does not build or deploy the final solution.
-name: 07 Final Assessment Readiness Workflow
+name: Final Assessment CI/CD
 
 on:
-  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
 
 env:
   IMAGE_NAME: tiny-health-app
 
 jobs:
-  verify:
+
+  # 🔹 CI
+  ci:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: Run tests
+      - name: Run Tests
         run: python -m unittest discover -s tests -v
 
-  check-registry-access:
-    needs: verify
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          scan-type: fs
+          scan-ref: .
+
+  # 🔹 CD
+  cd:
+    needs: ci
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check required GitHub secrets
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          VM_HOST: ${{ secrets.VM_HOST }}
-          VM_USER: ${{ secrets.VM_USER }}
-          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Generate Image Tag
+        id: tag
         run: |
-          missing_secret=0
-          for required in DOCKERHUB_USERNAME DOCKERHUB_TOKEN VM_HOST VM_USER VM_SSH_KEY; do
-            if [ -z "${!required}" ]; then
-              echo "Missing required GitHub secret: ${required}"
-              missing_secret=1
-            fi
-          done
+          TAG=$(date +%F)-${GITHUB_RUN_ID}
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Generated tag: $TAG"
 
-          if [ "${missing_secret}" -eq 1 ]; then
-            exit 1
-          fi
-
-          echo "All required GitHub secrets are present."
-
-      - name: Log in to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Show expected image repository
-        run: 'echo "Expected assessment image repository: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}"'
+      - name: Build Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG .
 
-  check-vm-readiness:
-    needs: check-registry-access
-    runs-on: ubuntu-latest
+      - name: Push Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG
 
-    steps:
-      - name: Check Ubuntu VM readiness over SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            set -e
-            docker --version
-            curl --version
-            docker ps
-            echo "VM readiness check passed."
+      - name: Deploy (Run Container)
+        run: |
+          docker stop tiny-app || true
+          docker rm tiny-app || true
+
+          docker run -d \
+            --name tiny-app \
+            -p 8000:8000 \
+            -e APP_VERSION=$TAG \
+            -e ENVIRONMENT=production \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG
+
+      - name: Validate
+        run: |
+          sleep 5
+          curl http://localhost:8000/health
+          curl http://localhost:8000/version
+          curl http://localhost:8000/status
