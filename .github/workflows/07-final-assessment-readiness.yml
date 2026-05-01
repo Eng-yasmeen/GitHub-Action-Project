@@ -10,7 +10,7 @@ env:
 
 jobs:
 
-  # CI
+  #CI
   ci:
     runs-on: ubuntu-latest
 
@@ -32,7 +32,7 @@ jobs:
           scan-type: fs
           scan-ref: .
 
-  # CD
+  #CD
   cd:
     needs: ci
     if: github.event_name == 'push'
