@@ -10,7 +10,7 @@ env:
 
 jobs:
 
-  # 🔹 CI
+  # CI
   ci:
     runs-on: ubuntu-latest
 
@@ -32,7 +32,7 @@ jobs:
           scan-type: fs
           scan-ref: .
 
-  # 🔹 CD
+  # CD
   cd:
     needs: ci
     if: github.event_name == 'push'
@@ -46,7 +46,7 @@ jobs:
         id: tag
         run: |
           TAG=$(date +%F)-${GITHUB_RUN_ID}
-          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Generated tag: $TAG"
 
       - name: Login to Docker Hub
@@ -57,11 +57,11 @@ jobs:
 
       - name: Build Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} .
 
       - name: Push Image
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
 
       - name: Deploy (Run Container)
         run: |
@@ -71,9 +71,9 @@ jobs:
           docker run -d \
             --name tiny-app \
             -p 8000:8000 \
-            -e APP_VERSION=$TAG \
+            -e APP_VERSION=${{ steps.tag.outputs.tag }} \
             -e ENVIRONMENT=production \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
 
       - name: Validate
         run: |
