@@ -64,13 +64,17 @@ jobs:
           TAG=${{ steps.tag.outputs.tag }}
           USER=${{ secrets.DOCKERHUB_USERNAME }}
           IMAGE="$USER/${{ env.IMAGE_NAME }}:$TAG"
-          echo "Building image: $IMAGE"
+          echo "Building: $IMAGE"
           docker build -t "$IMAGE" .
 
       # Push image
       - name: Push Docker Image
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          TAG=${{ steps.tag.outputs.tag }}
+          USER=${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE="$USER/${{ env.IMAGE_NAME }}:$TAG"
+          echo "Pushing: $IMAGE"
+          docker push "$IMAGE"
 
       # Run container locally (GitHub runner)
       - name: Deploy Container
