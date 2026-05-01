@@ -9,41 +9,39 @@ env:
   IMAGE_NAME: tiny-health-app
 
 jobs:
-
   ci:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4[cite: 1]
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5[cite: 1]
         with:
-          python-version: "3.12"
+          python-version: "3.12"[cite: 1]
 
-      - name: Run Tests
-        run: python -m unittest discover -s tests -v
+      - name: Run Unit Tests
+        run: python -m unittest discover -s tests -v[cite: 1]
 
-      - name: Run Trivy Scan
-        uses: aquasecurity/trivy-action@v0.20.0
+      - name: Run Trivy Security Scan
+        uses: aquasecurity/trivy-action@v0.20.0[cite: 1]
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          exit-code: '1' # سيوقف الـ Workflow إذا وجد ثغرات خطيرة
-          severity: 'CRITICAL,HIGH'
+          scan-type: 'fs'[cite: 1]
+          scan-ref: '.'[cite: 1]
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'[cite: 1]
 
-  # مرحلة الـ CD: الرفع إلى Docker Hub والتشغيل
   cd:
     needs: ci
-    if: github.event_name == 'push' # يعمل فقط عند الـ Push للمين برانش
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4[cite: 1]
 
-      - name: Generate Image Tag
+      - name: Generate Dynamic Image Tag
         id: tag
         run: |
           TAG=$(date +%F)-${GITHUB_RUN_ID}
@@ -51,35 +49,34 @@ jobs:
           echo "Generated tag: $TAG"
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v3[cite: 1]
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}[cite: 1]
+          password: ${{ secrets.DOCKERHUB_TOKEN }}[cite: 1]
 
-      - name: Build Image
+      - name: Build Docker Image
         run: |
-          # لاحظي النقطة في نهاية السطر لتفادي خطأ الـ Argument
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} .
 
-      - name: Push Image
+      - name: Push Image to Registry
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}[cite: 1]
 
-      - name: Deploy (Run Container)
+      - name: Deploy Container (Local Runner)
         run: |
-          docker stop tiny-app || true
-          docker rm tiny-app || true
+          docker stop tiny-app || true[cite: 1]
+          docker rm tiny-app || true[cite: 1]
 
           docker run -d \
             --name tiny-app \
             -p 8000:8000 \
             -e APP_VERSION=${{ steps.tag.outputs.tag }} \
             -e ENVIRONMENT=production \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}[cite: 1]
 
-      - name: Validate
+      - name: Validate Deployment
         run: |
-          sleep 10
-          curl http://localhost:8000/health
-          curl http://localhost:8000/version
-          curl http://localhost:8000/status
+          sleep 10 
+          curl http://localhost:8000/health[cite: 1]
+          curl http://localhost:8000/version[cite: 1]
+          curl http://localhost:8000/status[cite: 1]
