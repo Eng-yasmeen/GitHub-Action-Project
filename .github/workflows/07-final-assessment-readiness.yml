@@ -9,19 +9,21 @@ env:
   IMAGE_NAME: tiny-health-app
 
 jobs:
-
-  #CI
   ci:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+
+      - name: Install dependencies (if any)
+        run: |
+          python -m pip install --upgrade pip
 
       - name: Run Tests
         run: python -m unittest discover -s tests -v
@@ -32,16 +34,16 @@ jobs:
           scan-type: fs
           scan-ref: .
 
-  #CD
   cd:
     needs: ci
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v6
 
+      # Generate image tag
       - name: Generate Image Tag
         id: tag
         run: |
@@ -49,21 +51,25 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Generated tag: $TAG"
 
+      # Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Image
+      # Build image (FIXED with dot)
+      - name: Build Docker Image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} .
 
-      - name: Push Image
+      # Push image
+      - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
 
-      - name: Deploy (Run Container)
+      # Run container locally (GitHub runner)
+      - name: Deploy Container
         run: |
           docker stop tiny-app || true
           docker rm tiny-app || true
@@ -75,7 +81,8 @@ jobs:
             -e ENVIRONMENT=production \
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
 
-      - name: Validate
+      # Validate endpoints
+      - name: Validate Deployment
         run: |
           sleep 5
           curl http://localhost:8000/health
