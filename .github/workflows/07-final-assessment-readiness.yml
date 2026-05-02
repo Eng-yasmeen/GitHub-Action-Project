@@ -9,9 +9,6 @@ env:
 
 jobs:
 
-  # =====================
-  # CI
-  # =====================
   ci:
     runs-on: ubuntu-latest
 
@@ -35,9 +32,6 @@ jobs:
           exit-code: "0"
           severity: "CRITICAL,HIGH"
 
-  # =====================
-  # CD
-  # =====================
   cd:
     needs: ci
     runs-on: ubuntu-latest
@@ -45,10 +39,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      # ---------------------
-      # SAFE TAG GENERATION
-      # ---------------------
       - name: Generate Tag
         id: tag
         run: |
@@ -56,19 +46,11 @@ jobs:
           TAG="$(date +%F)-${GITHUB_RUN_ID}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Generated TAG: $TAG"
-
-      # ---------------------
-      # LOGIN (Docker Hub)
-      # ---------------------
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # ---------------------
-      # BUILD (SAFE STRING)
-      # ---------------------
       - name: Build Image
         run: |
           set -e
@@ -81,10 +63,6 @@ jobs:
           echo "Building IMAGE: $IMAGE"
 
           docker build --pull -t "$IMAGE" .
-
-      # ---------------------
-      # PUSH (SAFE STRING)
-      # ---------------------
       - name: Push Image
         run: |
           set -e
@@ -97,10 +75,6 @@ jobs:
           echo "Pushing IMAGE: $IMAGE"
 
           docker push "$IMAGE"
-
-      # ---------------------
-      # DEPLOY (SAFE RUN)
-      # ---------------------
       - name: Deploy Container
         run: |
           set -e
@@ -121,10 +95,6 @@ jobs:
             -e APP_VERSION="$TAG" \
             -e ENVIRONMENT=production \
             "$IMAGE"
-
-      # ---------------------
-      # VALIDATION (STRICT)
-      # ---------------------
       - name: Validate Deployment
         run: |
           set -e
