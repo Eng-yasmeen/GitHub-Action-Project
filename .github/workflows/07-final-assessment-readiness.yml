@@ -24,7 +24,8 @@ jobs:
       - name: Run Tests
         run: python -m unittest discover -s tests -v
 
-      - name: Run Trivy Scan
+      # FS scan (الكود نفسه)
+      - name: Run Trivy Scan (Filesystem)
         uses: aquasecurity/trivy-action@v0.20.0
         with:
           scan-type: fs
@@ -39,7 +40,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Generate Tag
         id: tag
         run: |
@@ -63,10 +63,9 @@ jobs:
 
           IMAGE="${USER}/${{ env.IMAGE_NAME }}:${TAG}"
 
-          echo "Building IMAGE: $IMAGE"
+          echo "Building: $IMAGE"
 
           docker build --pull -t "$IMAGE" .
-
       - name: Push Image
         run: |
           set -e
@@ -76,7 +75,7 @@ jobs:
 
           IMAGE="${USER}/${{ env.IMAGE_NAME }}:${TAG}"
 
-          echo "Pushing IMAGE: $IMAGE"
+          echo "Pushing: $IMAGE"
 
           docker push "$IMAGE"
 
@@ -88,8 +87,6 @@ jobs:
           USER="$(echo "${{ secrets.DOCKERHUB_USERNAME }}" | tr -d '[:space:]')"
 
           IMAGE="${USER}/${{ env.IMAGE_NAME }}:${TAG}"
-
-          echo "Running IMAGE: $IMAGE"
 
           docker stop tiny-app || true
           docker rm tiny-app || true
