@@ -81,6 +81,7 @@ jobs:
       - name: Deploy Container
         run: |
           set -e
+
           TAG="${{ steps.tag.outputs.tag }}"
           USER="$(echo "${{ secrets.DOCKERHUB_USERNAME }}" | tr -d '[:space:]')"
 
@@ -103,4 +104,4 @@ jobs:
 
           curl --fail http://localhost:8000/health
           curl --fail http://localhost:8000/version
-          curl --fail http://localhost:8000/status
+          curl --fail http://localhost:8000/status 
