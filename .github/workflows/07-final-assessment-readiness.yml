@@ -1,4 +1,4 @@
-name: Final Assessment CI/CD
+name: Final Deployment CI/CD
 
 on:
   push:
@@ -13,18 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Run Tests
         run: python -m unittest discover -s tests -v
 
-      - name: Run Trivy Scan (Filesystem)
+      - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@v0.20.0
         with:
           scan-type: fs
@@ -37,15 +35,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
       - name: Generate Tag
         id: tag
-        run: |
-          set -e
-          TAG="$(date +%F)-${GITHUB_RUN_ID}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Generated TAG: $TAG"
+        run: echo "tag=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -53,39 +47,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Image
+      - name: Build & Push
         run: |
-          set -e
+          TAG=${{ steps.tag.outputs.tag }}
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/tiny-health-app:$TAG
 
-          TAG="${{ steps.tag.outputs.tag }}"
-          USER="$(echo "${{ secrets.DOCKERHUB_USERNAME }}" | tr -d '[:space:]')"
-
-          IMAGE="${USER}/${{ env.IMAGE_NAME }}:${TAG}"
-
-          echo "Building: $IMAGE"
-
-          docker build --pull -t "$IMAGE" .
-      - name: Push Image
-        run: |
-          set -e
-
-          TAG="${{ steps.tag.outputs.tag }}"
-          USER="$(echo "${{ secrets.DOCKERHUB_USERNAME }}" | tr -d '[:space:]')"
-
-          IMAGE="${USER}/${{ env.IMAGE_NAME }}:${TAG}"
-
-          echo "Pushing: $IMAGE"
-
-          docker push "$IMAGE"
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
       - name: Deploy Container
         run: |
-          set -e
-
-          TAG="${{ steps.tag.outputs.tag }}"
-          USER="$(echo "${{ secrets.DOCKERHUB_USERNAME }}" | tr -d '[:space:]')"
-
-          IMAGE="${USER}/${{ env.IMAGE_NAME }}:${TAG}"
+          TAG=${{ steps.tag.outputs.tag }}
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/tiny-health-app:$TAG
 
           docker stop tiny-app || true
           docker rm tiny-app || true
@@ -93,15 +66,13 @@ jobs:
           docker run -d \
             --name tiny-app \
             -p 8000:8000 \
-            -e APP_VERSION="$TAG" \
+            -e APP_VERSION=$TAG \
             -e ENVIRONMENT=production \
-            "$IMAGE"
+            $IMAGE
 
       - name: Validate Deployment
         run: |
-          set -e
-          sleep 10
-
+          sleep 15
           curl --fail http://localhost:8000/health
           curl --fail http://localhost:8000/version
           curl --fail http://localhost:8000/status
