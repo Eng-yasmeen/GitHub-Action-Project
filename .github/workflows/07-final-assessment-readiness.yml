@@ -104,4 +104,4 @@ jobs:
 
           curl --fail http://localhost:8000/health
           curl --fail http://localhost:8000/version
-          curl --fail http://localhost:8000/status كده؟
+          curl --fail http://localhost:8000/status 
