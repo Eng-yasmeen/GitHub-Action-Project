@@ -3,7 +3,6 @@ name: Final Deployment CI/CD
 on:
   push:
     branches: [main]
-
 env:
   IMAGE_NAME: tiny-health-app
 
